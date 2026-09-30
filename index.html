@@ -132,8 +132,26 @@
 
   // Envoie une commande (une à la fois, dans l'ordre)
   function envoyer(texte) {
-    if (!carCmd) return;
+    if (!carCmd) return Promise.resolve();
     file = file.then(() => carCmd.writeValue(new TextEncoder().encode(texte))).catch(() => {});
+    return file;
+  }
+
+  // Volume en direct : on envoie la dernière position du curseur dès que le Bluetooth est libre
+  let glisse = false, volEnCours = false, volAttente = null;
+  function envoyerVolume(v) {
+    volAttente = v;
+    if (volEnCours) return;
+    volEnCours = true;
+    (async () => {
+      while (volAttente !== null) {
+        const val = volAttente;
+        volAttente = null;
+        await envoyer("V" + val);
+        await new Promise(r => setTimeout(r, 60));   // ~15 mises à jour par seconde max
+      }
+      volEnCours = false;
+    })();
   }
 
   // Met l'interface à jour avec l'état reçu : "lecture,volume,pir,pret"
@@ -143,8 +161,10 @@
     btn.classList.toggle("lecture", lecture === 1);
     $("iconeSon").textContent = lecture === 1 ? "■" : "▶";
     $("texteSon").textContent = lecture === 1 ? "Arrêter" : "Lancer";
-    if (document.activeElement !== $("volume")) $("volume").value = volume;
-    $("valVolume").textContent = volume;
+    if (!glisse) {                       // ne pas faire sauter le curseur pendant qu'on le bouge
+      $("volume").value = volume;
+      $("valVolume").textContent = volume;
+    }
     $("pir").checked = pir === 1;
     $("sousPir").textContent = pir === 1 ? (pret === 1 ? "Activé — en attente d'un mouvement" : "Activé — chauffe du capteur…") : "Désactivé";
   }
@@ -186,8 +206,18 @@
   $("btnConnecter").onclick = connecter;
   $("btnDeco").onclick = () => { if (appareil && appareil.gatt.connected) appareil.gatt.disconnect(); };
   $("btnSon").onclick = () => envoyer("TOGGLE");
-  $("volume").oninput = e => $("valVolume").textContent = e.target.value;
-  $("volume").onchange = e => envoyer("V" + e.target.value);
+  const curseur = $("volume");
+  curseur.addEventListener("pointerdown", () => glisse = true);
+  ["pointerup", "pointercancel"].forEach(ev =>
+    curseur.addEventListener(ev, () => setTimeout(() => glisse = false, 300)));
+  curseur.addEventListener("input", e => {
+    $("valVolume").textContent = e.target.value;
+    envoyerVolume(e.target.value);                // appliqué en direct pendant le glissement
+  });
+  curseur.addEventListener("change", e => {
+    envoyerVolume(e.target.value);                // valeur finale au lâcher
+    setTimeout(() => glisse = false, 300);
+  });
   $("pir").onchange = e => envoyer(e.target.checked ? "PIR1" : "PIR0");
 </script>
 </body>

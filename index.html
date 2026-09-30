@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0a0f">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Citrouille</title>
+<style>
+  :root {
+    --fond: #0d0a0f;
+    --carte: #1a1420;
+    --bord: #2c2233;
+    --orange: #ff7a1a;
+    --orange-clair: #ffb067;
+    --violet: #9b5cff;
+    --texte: #f4ece6;
+    --gris: #9a8f96;
+    --vert: #5fdc8a;
+    --rouge: #ff5a5a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--fond); color: var(--texte);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { min-height: 100vh; padding: 24px 16px 40px;
+    background: radial-gradient(120% 60% at 50% 0%, #2a1530 0%, var(--fond) 60%); }
+  .app { max-width: 420px; margin: 0 auto; }
+
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: .5px; }
+  h1 span { font-size: 30px; margin-right: 6px; }
+  .pastille { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--gris);
+    background: var(--carte); border: 1px solid var(--bord); padding: 6px 12px; border-radius: 999px; }
+  .pastille i { width: 9px; height: 9px; border-radius: 50%; background: var(--rouge); }
+  .pastille.ok i { background: var(--vert); box-shadow: 0 0 8px var(--vert); }
+
+  .connexion { text-align: center; padding: 40px 0; }
+  .connexion p { color: var(--gris); line-height: 1.5; margin: 18px 0 0; }
+  .btn-connecter { width: 100%; padding: 20px; font-size: 20px; font-weight: 700; border: 0; border-radius: 18px;
+    background: linear-gradient(135deg, var(--orange), #ff4d1a); color: #1a0d05; cursor: pointer; }
+  .btn-connecter:active { transform: scale(.98); }
+  .erreur { color: var(--rouge); margin-top: 16px; min-height: 1.4em; }
+
+  .panneau { display: none; }
+  .connecte .panneau { display: block; }
+  .connecte .connexion { display: none; }
+
+  .carte { background: var(--carte); border: 1px solid var(--bord); border-radius: 20px; padding: 20px; margin-bottom: 16px; }
+  .titre { font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--gris); margin: 0 0 14px; }
+
+  .btn-son { width: 100%; aspect-ratio: 1 / 1; max-height: 260px; border-radius: 50%; border: 0; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    font-size: 20px; font-weight: 700; color: #1a0d05; margin: 4px auto 0;
+    background: radial-gradient(circle at 50% 40%, var(--orange-clair), var(--orange) 55%, #c94a00);
+    box-shadow: 0 0 0 8px rgba(255,122,26,.12), 0 10px 40px rgba(255,122,26,.35); }
+  .btn-son .icone { font-size: 56px; line-height: 1; }
+  .btn-son.lecture { animation: pulse 1.2s ease-in-out infinite; }
+  .btn-son:active { transform: scale(.97); }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 8px rgba(255,122,26,.15), 0 10px 40px rgba(255,122,26,.35); }
+    50%     { box-shadow: 0 0 0 18px rgba(255,122,26,.05), 0 10px 60px rgba(255,122,26,.6); }
+  }
+  .centre { display: flex; justify-content: center; }
+  .rond { width: 70%; }
+
+  .ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .valeur { font-size: 22px; font-weight: 700; color: var(--orange-clair); min-width: 3ch; text-align: right; }
+  input[type=range] { width: 100%; margin-top: 12px; accent-color: var(--orange); height: 36px; }
+
+  .interrupteur { position: relative; width: 64px; height: 36px; flex-shrink: 0; }
+  .interrupteur input { opacity: 0; width: 0; height: 0; }
+  .glissiere { position: absolute; inset: 0; background: #3a2f40; border-radius: 999px; transition: .2s; cursor: pointer; }
+  .glissiere::before { content: ""; position: absolute; width: 28px; height: 28px; left: 4px; top: 4px;
+    background: #fff; border-radius: 50%; transition: .2s; }
+  .interrupteur input:checked + .glissiere { background: var(--violet); }
+  .interrupteur input:checked + .glissiere::before { transform: translateX(28px); }
+  .sous { color: var(--gris); font-size: 14px; margin-top: 6px; }
+
+  .btn-deco { width: 100%; background: transparent; border: 1px solid var(--bord); color: var(--gris);
+    padding: 14px; border-radius: 14px; font-size: 15px; cursor: pointer; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <h1><span>🎃</span>Citrouille</h1>
+    <div class="pastille" id="pastille"><i></i><b id="statut">Déconnectée</b></div>
+  </header>
+
+  <!-- Écran de connexion -->
+  <section class="connexion">
+    <button class="btn-connecter" id="btnConnecter">Connecter la citrouille</button>
+    <div class="erreur" id="erreur"></div>
+    <p>Allume la citrouille, active le Bluetooth du téléphone,<br>puis choisis « Citrouille » dans la liste.</p>
+  </section>
+
+  <!-- Panneau de contrôle -->
+  <section class="panneau">
+    <div class="carte">
+      <p class="titre">Son</p>
+      <div class="centre"><div class="rond">
+        <button class="btn-son" id="btnSon"><span class="icone" id="iconeSon">▶</span><span id="texteSon">Lancer</span></button>
+      </div></div>
+    </div>
+
+    <div class="carte">
+      <div class="ligne"><p class="titre" style="margin:0">Volume</p><span class="valeur" id="valVolume">20</span></div>
+      <input type="range" id="volume" min="0" max="30" value="20">
+    </div>
+
+    <div class="carte">
+      <div class="ligne">
+        <div>
+          <p class="titre" style="margin:0">Détecteur de mouvement</p>
+          <div class="sous" id="sousPir">Désactivé</div>
+        </div>
+        <label class="interrupteur"><input type="checkbox" id="pir"><span class="glissiere"></span></label>
+      </div>
+    </div>
+
+    <button class="btn-deco" id="btnDeco">Se déconnecter</button>
+  </section>
+</div>
+
+<script>
+  const SERVICE = "7a1e0000-5c3b-4d6e-9f10-a1b2c3d4e5f6";
+  const CMD     = "7a1e0001-5c3b-4d6e-9f10-a1b2c3d4e5f6";
+  const ETAT    = "7a1e0002-5c3b-4d6e-9f10-a1b2c3d4e5f6";
+
+  const $ = id => document.getElementById(id);
+  let appareil = null, carCmd = null, file = Promise.resolve();
+
+  // Envoie une commande (une à la fois, dans l'ordre)
+  function envoyer(texte) {
+    if (!carCmd) return;
+    file = file.then(() => carCmd.writeValue(new TextEncoder().encode(texte))).catch(() => {});
+  }
+
+  // Met l'interface à jour avec l'état reçu : "lecture,volume,pir,pret"
+  function majEtat(texte) {
+    const [lecture, volume, pir, pret] = texte.split(",").map(Number);
+    const btn = $("btnSon");
+    btn.classList.toggle("lecture", lecture === 1);
+    $("iconeSon").textContent = lecture === 1 ? "■" : "▶";
+    $("texteSon").textContent = lecture === 1 ? "Arrêter" : "Lancer";
+    if (document.activeElement !== $("volume")) $("volume").value = volume;
+    $("valVolume").textContent = volume;
+    $("pir").checked = pir === 1;
+    $("sousPir").textContent = pir === 1 ? (pret === 1 ? "Activé — en attente d'un mouvement" : "Activé — chauffe du capteur…") : "Désactivé";
+  }
+
+  function afficherConnecte(ok) {
+    $("app").classList.toggle("connecte", ok);
+    $("pastille").classList.toggle("ok", ok);
+    $("statut").textContent = ok ? "Connectée" : "Déconnectée";
+  }
+
+  async function connecter() {
+    $("erreur").textContent = "";
+    if (!navigator.bluetooth) {
+      $("erreur").textContent = "Ce navigateur ne gère pas le Bluetooth. Ouvre la page dans Chrome sur Android.";
+      return;
+    }
+    try {
+      appareil = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: "Citrouille" }],
+        optionalServices: [SERVICE]
+      });
+      appareil.addEventListener("gattserverdisconnected", () => { carCmd = null; afficherConnecte(false); });
+      $("statut").textContent = "Connexion…";
+      const serveur = await appareil.gatt.connect();
+      const service = await serveur.getPrimaryService(SERVICE);
+      carCmd = await service.getCharacteristic(CMD);
+      const carEtat = await service.getCharacteristic(ETAT);
+      carEtat.addEventListener("characteristicvaluechanged",
+        e => majEtat(new TextDecoder().decode(e.target.value)));
+      await carEtat.startNotifications();
+      majEtat(new TextDecoder().decode(await carEtat.readValue()));
+      afficherConnecte(true);
+    } catch (e) {
+      afficherConnecte(false);
+      if (e.name !== "NotFoundError") $("erreur").textContent = "Connexion impossible : " + e.message;
+    }
+  }
+
+  $("btnConnecter").onclick = connecter;
+  $("btnDeco").onclick = () => { if (appareil && appareil.gatt.connected) appareil.gatt.disconnect(); };
+  $("btnSon").onclick = () => envoyer("TOGGLE");
+  $("volume").oninput = e => $("valVolume").textContent = e.target.value;
+  $("volume").onchange = e => envoyer("V" + e.target.value);
+  $("pir").onchange = e => envoyer(e.target.checked ? "PIR1" : "PIR0");
+</script>
+</body>
+</html>

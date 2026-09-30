@@ -76,6 +76,20 @@
   .interrupteur input:checked + .glissiere::before { transform: translateX(28px); }
   .sous { color: var(--gris); font-size: 14px; margin-top: 6px; }
 
+  .en-cours { text-align: center; color: var(--gris); margin: 16px 0 0; font-size: 15px; min-height: 1.3em; }
+  .en-cours b { color: var(--texte); }
+
+  .grille { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .son { background: #241b2b; border: 2px solid transparent; border-radius: 14px; padding: 12px 10px;
+    color: var(--texte); font-size: 15px; font-weight: 600; text-align: left; line-height: 1.2;
+    display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 60px; font-family: inherit; }
+  .son .emo { font-size: 24px; flex-shrink: 0; }
+  .son:active { transform: scale(.97); }
+  .son.choisi { border-color: var(--orange); background: #2e1f1a; }
+  .son.joue .emo { animation: sautille .5s ease-in-out infinite alternate; }
+  .son.hasard { grid-column: 1 / -1; justify-content: center; }
+  @keyframes sautille { from { transform: scale(1) rotate(-6deg); } to { transform: scale(1.25) rotate(6deg); } }
+
   .btn-deco { width: 100%; background: transparent; border: 1px solid var(--bord); color: var(--gris);
     padding: 14px; border-radius: 14px; font-size: 15px; cursor: pointer; margin-top: 8px; }
 </style>
@@ -101,6 +115,12 @@
       <div class="centre"><div class="rond">
         <button class="btn-son" id="btnSon"><span class="icone" id="iconeSon">▶</span><span id="texteSon">Lancer</span></button>
       </div></div>
+      <p class="en-cours" id="enCours"></p>
+    </div>
+
+    <div class="carte">
+      <p class="titre">Choix du son</p>
+      <div class="grille" id="grille"></div>
     </div>
 
     <div class="carte">
@@ -154,9 +174,40 @@
     })();
   }
 
-  // Met l'interface à jour avec l'état reçu : "lecture,volume,pir,pret"
+  // Liste des sons (même ordre que 0001.mp3 ... 0006.mp3 sur la carte SD)
+  const SONS = [
+    { n: 1, emo: "🔪", nom: "Halloween (thème)" },
+    { n: 2, emo: "🎠", nom: "Boîte à musique" },
+    { n: 3, emo: "🎻", nom: "Musique qui fait peur" },
+    { n: 4, emo: "👻", nom: "Sons d'horreur" },
+    { n: 5, emo: "😱", nom: "Effet effrayant" },
+    { n: 6, emo: "🎈", nom: "Ça (thème)" },
+    { n: 0, emo: "🎲", nom: "Au hasard", hasard: true }
+  ];
+  const nomSon = n => (SONS.find(s => s.n === n) || {}).nom || "";
+
+  // Crée les boutons de sons
+  SONS.forEach(s => {
+    const b = document.createElement("button");
+    b.className = "son" + (s.hasard ? " hasard" : "");
+    b.id = "son" + s.n;
+    b.innerHTML = `<span class="emo">${s.emo}</span><span>${s.nom}</span>`;
+    b.onclick = () => envoyer("S" + s.n);          // choisit ET joue ce son
+    $("grille").appendChild(b);
+  });
+
+  // Met l'interface à jour avec l'état reçu : "lecture,volume,pir,pret,choix,piste"
   function majEtat(texte) {
-    const [lecture, volume, pir, pret] = texte.split(",").map(Number);
+    const [lecture, volume, pir, pret, choixRecu, piste] = texte.split(",").map(Number);
+    const choix = isNaN(choixRecu) ? 1 : choixRecu;
+    SONS.forEach(s => {
+      const b = $("son" + s.n);
+      b.classList.toggle("choisi", s.n === choix);
+      b.classList.toggle("joue", lecture === 1 && s.n === piste);
+    });
+    $("enCours").innerHTML = lecture === 1 && piste > 0
+      ? "En cours : <b>" + nomSon(piste) + "</b>"
+      : "Son choisi : <b>" + (choix === 0 ? "au hasard" : nomSon(choix)) + "</b>";
     const btn = $("btnSon");
     btn.classList.toggle("lecture", lecture === 1);
     $("iconeSon").textContent = lecture === 1 ? "■" : "▶";

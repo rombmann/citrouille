@@ -87,15 +87,25 @@
   .onglet.actif .pt { background: #1a0d05; }
   .onglet.a-choix .pt { visibility: visible; }
 
-  .grille { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .son { background: #241b2b; border: 2px solid transparent; border-radius: 14px; padding: 12px 10px;
     color: var(--texte); font-size: 15px; font-weight: 600; text-align: left; line-height: 1.2;
     display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 60px; font-family: inherit; }
   .son .emo { font-size: 24px; flex-shrink: 0; }
+  .son > span:nth-child(2) { min-width: 0; overflow-wrap: break-word; }
   .son:active { transform: scale(.97); }
   .son.choisi { border-color: var(--orange); background: #2e1f1a; }
   .son.joue .emo { animation: sautille .5s ease-in-out infinite alternate; }
-  .son.hasard { grid-column: 1 / -1; justify-content: center; }
+  .son.hasard { grid-column: 1 / -1; justify-content: center; order: -1; }
+  .son:not(.hasard) { position: relative; padding: 10px 26px 10px 8px; gap: 6px; font-size: 14px; }
+  .son:not(.hasard) .emo { font-size: 20px; }
+  .de { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; background: #1a1420;
+    border: 1px solid var(--bord); opacity: .35; filter: grayscale(1); transition: .15s; }
+  .de::after { content: ""; position: absolute; inset: -8px; }   /* zone de toucher plus grande */
+  .de.dans-pool { opacity: 1; filter: none; background: #3a2412; border-color: var(--orange); }
+  .aide { color: var(--gris); font-size: 13px; margin: -4px 0 12px; }
+  .aide .mini { display: inline-block; padding: 0 5px; border-radius: 6px; background: #3a2412; border: 1px solid var(--orange); }
   @keyframes sautille { from { transform: scale(1) rotate(-6deg); } to { transform: scale(1.25) rotate(6deg); } }
 
   .btn-deco { width: 100%; background: transparent; border: 1px solid var(--bord); color: var(--gris);
@@ -129,6 +139,7 @@
     <div class="carte">
       <p class="titre">Choix du son</p>
       <div class="onglets" id="onglets"></div>
+      <p class="aide">Touche <span class="mini">🎲</span> sur un son pour l'ajouter au tirage au hasard (bouton 🎲 et détecteur).</p>
       <div class="grille" id="grille"></div>
     </div>
 
@@ -214,7 +225,10 @@
   const nomSon = n => (SONS.find(s => s.n === n) || {}).nom || "";
   const catDe = n => (SONS.find(s => s.n === n) || {}).cat;
   let ongletActif = "horreur";
-  let dernierEtat = "0,20,0,0,1,0";
+  let dernierEtat = "0,20,0,0,1,0,3f";
+  let pool = 0x3F;                                   // sons faisant partie du tirage au hasard
+  const dansPool = n => (pool & (1 << (n - 1))) !== 0;
+  const taillePool = () => SONS.filter(s => !s.hasard && dansPool(s.n)).length;
 
   // Onglets
   CATEGORIES.forEach(c => {
@@ -231,22 +245,47 @@
     const b = document.createElement("button");
     b.className = "son" + (s.hasard ? " hasard" : "");
     b.id = "son" + s.n;
-    b.innerHTML = `<span class="emo">${s.emo}</span><span>${s.nom}</span>`;
+    b.innerHTML = `<span class="emo">${s.emo}</span><span id="nom${s.n}">${s.nom}</span>`;
     b.onclick = () => envoyer("S" + s.n);          // choisit ET joue ce son
+    if (!s.hasard) {
+      const de = document.createElement("span");
+      de.className = "de";
+      de.id = "de" + s.n;
+      de.textContent = "🎲";
+      de.title = "Ajouter / retirer du tirage au hasard";
+      de.onclick = e => {                          // ne joue pas le son, change juste le pool
+        e.stopPropagation();
+        const nouveau = pool ^ (1 << (s.n - 1));
+        if (nouveau === 0) { $("enCours").textContent = "Il faut garder au moins un son dans le tirage 🎲"; return; }
+        pool = nouveau;
+        majPool();
+        envoyer("R" + pool.toString(16).toUpperCase());
+      };
+      b.appendChild(de);
+    }
     $("grille").appendChild(b);
   });
 
+  function majPool() {
+    SONS.forEach(s => { if (!s.hasard) $("de" + s.n).classList.toggle("dans-pool", dansPool(s.n)); });
+    const t = taillePool();
+    $("nom0").textContent = "Au hasard · " + t + (t > 1 ? " sons" : " son");
+  }
+
   function afficherGrille() {
-    SONS.forEach(s => { $("son" + s.n).style.display = s.cat === ongletActif ? "" : "none"; });
+    SONS.forEach(s => { $("son" + s.n).style.display = (s.hasard || s.cat === ongletActif) ? "" : "none"; });
     CATEGORIES.forEach(c => $("onglet-" + c.id).classList.toggle("actif", c.id === ongletActif));
   }
   afficherGrille();
+  majPool();
 
-  // Met l'interface à jour avec l'état reçu : "lecture,volume,pir,pret,choix,piste"
+  // Met l'interface à jour avec l'état reçu : "lecture,volume,pir,pret,choix,piste,pool"
   function majEtat(texte) {
     dernierEtat = texte;
-    const [lecture, volume, pir, pret, choixRecu, piste] = texte.split(",").map(Number);
+    const morceaux = texte.split(",");
+    const [lecture, volume, pir, pret, choixRecu, piste] = morceaux.map(Number);
     const choix = isNaN(choixRecu) ? 1 : choixRecu;
+    if (morceaux[6]) { pool = parseInt(morceaux[6], 16) || pool; majPool(); }
     SONS.forEach(s => {
       const b = $("son" + s.n);
       b.classList.toggle("choisi", s.n === choix);
@@ -256,7 +295,7 @@
     CATEGORIES.forEach(c => $("onglet-" + c.id).classList.toggle("a-choix", c.id === catDe(choix)));
     $("enCours").innerHTML = lecture === 1 && piste > 0
       ? "En cours : <b>" + nomSon(piste) + "</b>"
-      : "Son choisi : <b>" + (choix === 0 ? "au hasard (horreur)" : nomSon(choix)) + "</b>";
+      : "Son choisi : <b>" + (choix === 0 ? "au hasard (" + taillePool() + " sons)" : nomSon(choix)) + "</b>";
     const btn = $("btnSon");
     btn.classList.toggle("lecture", lecture === 1);
     $("iconeSon").textContent = lecture === 1 ? "■" : "▶";
@@ -266,7 +305,7 @@
       $("valVolume").textContent = volume;
     }
     $("pir").checked = pir === 1;
-    $("sousPir").textContent = pir === 1 ? (pret === 1 ? "Activé — en attente d'un mouvement" : "Activé — chauffe du capteur…") : "Désactivé";
+    $("sousPir").textContent = pir === 1 ? (pret === 1 ? "Activé — joue un son au hasard 🎲 à chaque mouvement" : "Activé — chauffe du capteur…") : "Désactivé";
   }
 
   function afficherConnecte(ok) {

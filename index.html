@@ -79,6 +79,14 @@
   .en-cours { text-align: center; color: var(--gris); margin: 16px 0 0; font-size: 15px; min-height: 1.3em; }
   .en-cours b { color: var(--texte); }
 
+  .onglets { display: flex; gap: 6px; background: #120d16; border: 1px solid var(--bord); border-radius: 14px; padding: 4px; margin-bottom: 14px; }
+  .onglet { flex: 1; border: 0; background: transparent; color: var(--gris); font: inherit; font-size: 14px; font-weight: 700;
+    padding: 10px 4px; border-radius: 10px; cursor: pointer; }
+  .onglet.actif { background: var(--orange); color: #1a0d05; }
+  .onglet .pt { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); margin-left: 5px; vertical-align: middle; visibility: hidden; }
+  .onglet.actif .pt { background: #1a0d05; }
+  .onglet.a-choix .pt { visibility: visible; }
+
   .grille { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .son { background: #241b2b; border: 2px solid transparent; border-radius: 14px; padding: 12px 10px;
     color: var(--texte); font-size: 15px; font-weight: 600; text-align: left; line-height: 1.2;
@@ -120,6 +128,7 @@
 
     <div class="carte">
       <p class="titre">Choix du son</p>
+      <div class="onglets" id="onglets"></div>
       <div class="grille" id="grille"></div>
     </div>
 
@@ -175,18 +184,49 @@
   }
 
   // Liste des sons (même ordre que 0001.mp3 ... 0006.mp3 sur la carte SD)
+  const CATEGORIES = [
+    { id: "horreur",   nom: "🎃 Horreur" },
+    { id: "minecraft", nom: "⛏️ Minecraft" },
+    { id: "speciaux",  nom: "⭐ Spéciaux" }
+  ];
   const SONS = [
-    { n: 1, emo: "🔪", nom: "Halloween (thème)" },
-    { n: 2, emo: "🎠", nom: "Boîte à musique" },
-    { n: 3, emo: "🎻", nom: "Musique qui fait peur" },
-    { n: 4, emo: "👻", nom: "Sons d'horreur" },
-    { n: 5, emo: "😱", nom: "Effet effrayant" },
-    { n: 6, emo: "🎈", nom: "Ça (thème)" },
-    { n: 0, emo: "🎲", nom: "Au hasard", hasard: true }
+    { n: 1,  cat: "horreur",   emo: "🔪", nom: "Halloween (thème)" },
+    { n: 2,  cat: "horreur",   emo: "🎠", nom: "Boîte à musique" },
+    { n: 3,  cat: "horreur",   emo: "🎻", nom: "Musique qui fait peur" },
+    { n: 4,  cat: "horreur",   emo: "👻", nom: "Sons d'horreur" },
+    { n: 5,  cat: "horreur",   emo: "😱", nom: "Effet effrayant" },
+    { n: 6,  cat: "horreur",   emo: "🎈", nom: "Ça (thème)" },
+    { n: 0,  cat: "horreur",   emo: "🎲", nom: "Au hasard", hasard: true },
+    { n: 7,  cat: "minecraft", emo: "🟣", nom: "Enderman" },
+    { n: 8,  cat: "minecraft", emo: "💀", nom: "Squelette" },
+    { n: 9,  cat: "minecraft", emo: "🕷️", nom: "Araignée" },
+    { n: 10, cat: "minecraft", emo: "🧑‍🌾", nom: "Villageois" },
+    { n: 11, cat: "minecraft", emo: "💥", nom: "Creeper" },
+    { n: 12, cat: "minecraft", emo: "☁️", nom: "Ghast" },
+    { n: 13, cat: "minecraft", emo: "🧟", nom: "Zombie" },
+    { n: 14, cat: "minecraft", emo: "🧙", nom: "Rire de sorcière" },
+    { n: 15, cat: "speciaux",  emo: "🎧", nom: "Miguel Phonk" },
+    { n: 16, cat: "speciaux",  emo: "🕺", nom: "Hava Nagila" },
+    { n: 17, cat: "speciaux",  emo: "🌅", nom: "Red Sun in the Sky" },
+    { n: 18, cat: "speciaux",  emo: "☮️", nom: "That's La Peace" },
+    { n: 19, cat: "speciaux",  emo: "😳", nom: "Wait Wait Wait…" }
   ];
   const nomSon = n => (SONS.find(s => s.n === n) || {}).nom || "";
+  const catDe = n => (SONS.find(s => s.n === n) || {}).cat;
+  let ongletActif = "horreur";
+  let dernierEtat = "0,20,0,0,1,0";
 
-  // Crée les boutons de sons
+  // Onglets
+  CATEGORIES.forEach(c => {
+    const b = document.createElement("button");
+    b.className = "onglet";
+    b.id = "onglet-" + c.id;
+    b.innerHTML = c.nom + '<span class="pt"></span>';
+    b.onclick = () => { ongletActif = c.id; afficherGrille(); majEtat(dernierEtat); };
+    $("onglets").appendChild(b);
+  });
+
+  // Boutons de sons (tous créés une fois, on affiche ceux de l'onglet actif)
   SONS.forEach(s => {
     const b = document.createElement("button");
     b.className = "son" + (s.hasard ? " hasard" : "");
@@ -196,8 +236,15 @@
     $("grille").appendChild(b);
   });
 
+  function afficherGrille() {
+    SONS.forEach(s => { $("son" + s.n).style.display = s.cat === ongletActif ? "" : "none"; });
+    CATEGORIES.forEach(c => $("onglet-" + c.id).classList.toggle("actif", c.id === ongletActif));
+  }
+  afficherGrille();
+
   // Met l'interface à jour avec l'état reçu : "lecture,volume,pir,pret,choix,piste"
   function majEtat(texte) {
+    dernierEtat = texte;
     const [lecture, volume, pir, pret, choixRecu, piste] = texte.split(",").map(Number);
     const choix = isNaN(choixRecu) ? 1 : choixRecu;
     SONS.forEach(s => {
@@ -205,9 +252,11 @@
       b.classList.toggle("choisi", s.n === choix);
       b.classList.toggle("joue", lecture === 1 && s.n === piste);
     });
+    // petit point sur l'onglet qui contient le son choisi
+    CATEGORIES.forEach(c => $("onglet-" + c.id).classList.toggle("a-choix", c.id === catDe(choix)));
     $("enCours").innerHTML = lecture === 1 && piste > 0
       ? "En cours : <b>" + nomSon(piste) + "</b>"
-      : "Son choisi : <b>" + (choix === 0 ? "au hasard" : nomSon(choix)) + "</b>";
+      : "Son choisi : <b>" + (choix === 0 ? "au hasard (horreur)" : nomSon(choix)) + "</b>";
     const btn = $("btnSon");
     btn.classList.toggle("lecture", lecture === 1);
     $("iconeSon").textContent = lecture === 1 ? "■" : "▶";

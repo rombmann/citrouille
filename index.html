@@ -108,6 +108,17 @@
   .aide .mini { display: inline-block; padding: 0 5px; border-radius: 6px; background: #3a2412; border: 1px solid var(--orange); }
   @keyframes sautille { from { transform: scale(1) rotate(-6deg); } to { transform: scale(1.25) rotate(6deg); } }
 
+  .couleurs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .pastille-coul { display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 50%; border: 3px solid transparent; cursor: pointer; padding: 0;
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,.25); position: relative; }
+  .pastille-coul.choisie { border-color: var(--texte); box-shadow: 0 0 14px var(--c, #fff); }
+  .pastille-coul:active { transform: scale(.94); }
+  .nom-coul { display: block; text-align: center; font-size: 12px; color: var(--gris); margin-top: 4px; }
+  .case-coul { min-width: 0; }
+  .perso { position: relative; overflow: hidden;
+    background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+  .perso input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+
   .btn-deco { width: 100%; background: transparent; border: 1px solid var(--bord); color: var(--gris);
     padding: 14px; border-radius: 14px; font-size: 15px; cursor: pointer; margin-top: 8px; }
 </style>
@@ -144,6 +155,11 @@
     </div>
 
     <div class="carte">
+      <p class="titre">Couleur de la flamme</p>
+      <div class="couleurs" id="couleurs"></div>
+    </div>
+
+    <div class="carte">
       <div class="ligne"><p class="titre" style="margin:0">Volume</p><span class="valeur" id="valVolume">20</span></div>
       <input type="range" id="volume" min="0" max="30" value="20">
     </div>
@@ -165,6 +181,7 @@
 <script>
   const SERVICE = "7a1e0000-5c3b-4d6e-9f10-a1b2c3d4e5f6";
   const CMD     = "7a1e0001-5c3b-4d6e-9f10-a1b2c3d4e5f6";
+  const COUL    = "7a1e0003-5c3b-4d6e-9f10-a1b2c3d4e5f6";
   const ETAT    = "7a1e0002-5c3b-4d6e-9f10-a1b2c3d4e5f6";
 
   const $ = id => document.getElementById(id);
@@ -308,6 +325,77 @@
     $("sousPir").textContent = pir === 1 ? (pret === 1 ? "Activé — joue un son au hasard 🎲 à chaque mouvement" : "Activé — chauffe du capteur…") : "Désactivé";
   }
 
+  // ---------- Couleur de la flamme ----------
+  const COULEURS = [
+    { hex: "000000", nom: "Flamme",   apercu: "radial-gradient(circle at 50% 65%, #ffd36a, #ff7a1a 45%, #b52a00)" },
+    { hex: "FF0000", nom: "Sang" },
+    { hex: "00FF20", nom: "Sorcière" },
+    { hex: "9B30FF", nom: "Violet" },
+    { hex: "00A0FF", nom: "Fantôme" },
+    { hex: "FF2090", nom: "Rose" },
+    { hex: "FFFFFF", nom: "Blanc" },
+  ];
+  let couleur = "000000", dernierChoixCoul = 0;
+  function construireCouleurs() {
+    const zone = $("couleurs");
+    COULEURS.forEach(c => {
+      const caseC = document.createElement("div");
+      caseC.className = "case-coul";
+      const b = document.createElement("button");
+      b.className = "pastille-coul";
+      b.dataset.hex = c.hex;
+      b.style.background = c.apercu || "#" + c.hex;
+      b.style.setProperty("--c", c.apercu ? "#ff7a1a" : "#" + c.hex);
+      b.onclick = () => choisirCouleur(c.hex);
+      caseC.append(b, Object.assign(document.createElement("span"), { className: "nom-coul", textContent: c.nom }));
+      zone.append(caseC);
+    });
+    // 8e case : couleur libre avec le sélecteur du téléphone
+    const caseP = document.createElement("div");
+    caseP.className = "case-coul";
+    const p = document.createElement("label");
+    p.className = "pastille-coul perso";
+    p.id = "pastillePerso";
+    p.style.display = "block";
+    const entree = document.createElement("input");
+    entree.type = "color";
+    entree.id = "couleurPerso";
+    entree.value = "#ff7a1a";
+    entree.addEventListener("input", e => envoyerCouleurPerso(e.target.value.slice(1).toUpperCase()));
+    entree.addEventListener("change", e => choisirCouleur(e.target.value.slice(1).toUpperCase()));
+    p.append(entree);
+    caseP.append(p, Object.assign(document.createElement("span"), { className: "nom-coul", textContent: "Autre…" }));
+    zone.append(caseP);
+  }
+  function majCouleur(hex) {
+    couleur = hex.toUpperCase();
+    let trouve = false;
+    document.querySelectorAll(".pastille-coul[data-hex]").forEach(b => {
+      const ok = b.dataset.hex === couleur;
+      b.classList.toggle("choisie", ok);
+      if (ok) trouve = true;
+    });
+    const perso = $("pastillePerso");
+    perso.classList.toggle("choisie", !trouve);
+    if (!trouve) { perso.style.background = "#" + couleur; perso.style.setProperty("--c", "#" + couleur); $("couleurPerso").value = "#" + couleur.toLowerCase(); }
+    else { perso.style.background = ""; }
+  }
+  function choisirCouleur(hex) {
+    dernierChoixCoul = Date.now();
+    majCouleur(hex);
+    envoyer("C" + hex);
+  }
+  let minuterieCoul = null, coulEnAttente = null;    // limite l'envoi pendant qu'on glisse dans le sélecteur
+  function envoyerCouleurPerso(hex) {
+    dernierChoixCoul = Date.now();
+    majCouleur(hex);
+    coulEnAttente = hex;
+    if (minuterieCoul) return;
+    minuterieCoul = setTimeout(() => { minuterieCoul = null; envoyer("C" + coulEnAttente); }, 80);
+  }
+  construireCouleurs();
+  majCouleur(couleur);
+
   function afficherConnecte(ok) {
     $("app").classList.toggle("connecte", ok);
     $("pastille").classList.toggle("ok", ok);
@@ -335,6 +423,13 @@
         e => majEtat(new TextDecoder().decode(e.target.value)));
       await carEtat.startNotifications();
       majEtat(new TextDecoder().decode(await carEtat.readValue()));
+      try {                                              // couleur (absente sur les anciens codes Arduino)
+        const carCoul = await service.getCharacteristic(COUL);
+        carCoul.addEventListener("characteristicvaluechanged",
+          e => { if (Date.now() - dernierChoixCoul > 800) majCouleur(new TextDecoder().decode(e.target.value)); });
+        await carCoul.startNotifications();
+        majCouleur(new TextDecoder().decode(await carCoul.readValue()) || "000000");
+      } catch (e) { }
       afficherConnecte(true);
     } catch (e) {
       afficherConnecte(false);

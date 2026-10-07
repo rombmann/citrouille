@@ -214,6 +214,7 @@
 
   const $ = id => document.getElementById(id);
   let appareil = null, carCmd = null, file = Promise.resolve();
+  let minuterieCompte = null;   // relecture régulière du compteur (comme la page WiFi)
 
   // Envoie une commande (une à la fois, dans l'ordre)
   function envoyer(texte) {
@@ -454,7 +455,7 @@
         filters: [{ namePrefix: "Citrouille" }],
         optionalServices: [SERVICE]
       });
-      appareil.addEventListener("gattserverdisconnected", () => { carCmd = null; afficherConnecte(false); });
+      appareil.addEventListener("gattserverdisconnected", () => { carCmd = null; clearInterval(minuterieCompte); afficherConnecte(false); });
       $("statut").textContent = "Connexion…";
       const serveur = await appareil.gatt.connect();
       const service = await serveur.getPrimaryService(SERVICE);
@@ -476,9 +477,9 @@
       try {                                              // compteur (absent sur les anciens codes Arduino)
         const carCompte = await service.getCharacteristic(COMPTE);
         const relire = async () => majCompteur(new TextDecoder().decode(await carCompte.readValue()));
-        carCompte.addEventListener("characteristicvaluechanged", () => { relire().catch(() => {}); });
-        await carCompte.startNotifications();
-        await relire();
+        await relire();                                  // affichage immédiat
+        clearInterval(minuterieCompte);                  // puis relecture régulière (le Bluetooth coupe les notifications trop longues)
+        minuterieCompte = setInterval(() => relire().catch(() => {}), 1500);
       } catch (e) { }
       afficherConnecte(true);
     } catch (e) {

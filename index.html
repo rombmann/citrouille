@@ -471,7 +471,10 @@
         majCouleur(new TextDecoder().decode(await carCoul.readValue()) || "000000");
       } catch (e) { }
       // donne l'heure du téléphone à la citrouille (pour le compteur heure par heure)
-      envoyer("T" + Math.floor(Date.now() / 1000 - new Date().getTimezoneOffset() * 60));
+      // IMPORTANT : on attend que cet envoi soit bien terminé avant d'enchaîner sur une lecture
+      // (le Bluetooth sur téléphone ne supporte qu'une seule opération à la fois ;
+      //  sans ce "await", la lecture du compteur juste après pouvait échouer en silence)
+      await envoyer("T" + Math.floor(Date.now() / 1000 - new Date().getTimezoneOffset() * 60));
       try {                                              // compteur (absent sur les anciens codes Arduino)
         const carCompte = await service.getCharacteristic(COMPTE);
         const relire = async () => {

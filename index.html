@@ -191,9 +191,7 @@
         <div class="stat"><b id="vTotal">0</b><span>au total</span></div>
         <div class="stat"><b id="vAujourdhui">0</b><span>aujourd'hui</span></div>
       </div>
-      <div class="barres" id="barres"></div>
-      <div class="heures"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>23h</span></div>
-      <p class="sous">Chaque mouvement qui déclenche un son compte un visiteur. <button class="lien" id="btnZero">Remettre à zéro</button></p>
+      <p class="sous">Chaque mouvement qui déclenche un son compte un visiteur. <button class="lien" id="btnZero">Remettre à zéro</button><br>Le détail heure par heure est visible sur la page WiFi (<b>citrouille.local</b>).</p>
     </div>
 
     <div class="carte">
@@ -426,15 +424,14 @@
   majCouleur(couleur);
 
   // ---------- Compteur de visiteurs ----------
-  for (let h = 0; h < 24; h++) { const d = document.createElement("div"); d.id = "h" + h; $("barres").append(d); }
-  function majCompteur(texte) {                       // "total|h0,h1,...,h23"
-    const [total, heures] = texte.split("|");
-    const h = (heures || "").split(",").map(Number);
-    if (h.length !== 24) return;
-    const max = Math.max(1, ...h);
-    $("vTotal").textContent = Number(total) || 0;
-    $("vAujourdhui").textContent = h.reduce((a, b) => a + b, 0);
-    h.forEach((x, i) => $("h" + i).style.height = (x / max * 100) + "%");
+  // En Bluetooth la citrouille envoie juste "total|aujourdhui" (message court, qui passe toujours) :
+  // le détail heure par heure est trop long pour être fiable en Bluetooth sur tous les téléphones,
+  // il reste visible en entier sur la page WiFi (citrouille.local).
+  function majCompteur(texte) {                       // "total|aujourdhui"
+    const [total, aujourdhui] = texte.split("|").map(Number);
+    if (isNaN(total) || isNaN(aujourdhui)) return;
+    $("vTotal").textContent = total;
+    $("vAujourdhui").textContent = aujourdhui;
   }
   $("btnZero").onclick = () => { if (confirm("Remettre le compteur de visiteurs à zéro ?")) envoyer("Z"); };
 

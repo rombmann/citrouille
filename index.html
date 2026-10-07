@@ -192,7 +192,6 @@
         <div class="stat"><b id="vAujourdhui">0</b><span>aujourd'hui</span></div>
       </div>
       <p class="sous">Chaque mouvement qui déclenche un son compte un visiteur. <button class="lien" id="btnZero">Remettre à zéro</button><br>Le détail heure par heure est visible sur la page WiFi (<b>citrouille.local</b>).</p>
-      <p class="sous" id="compteDiag" style="color:var(--rouge)"></p>
     </div>
 
     <div class="carte">
@@ -477,17 +476,11 @@
       await envoyer("T" + Math.floor(Date.now() / 1000 - new Date().getTimezoneOffset() * 60));
       try {                                              // compteur (absent sur les anciens codes Arduino)
         const carCompte = await service.getCharacteristic(COMPTE);
-        const relire = async () => {
-          const brut = new TextDecoder().decode(await carCompte.readValue());
-          $("compteDiag").textContent = "debug : reçu « " + brut + " »";
-          majCompteur(brut);
-        };
+        const relire = async () => majCompteur(new TextDecoder().decode(await carCompte.readValue()));
         await relire();                                  // affichage immédiat
         clearInterval(minuterieCompte);                  // puis relecture régulière (le Bluetooth coupe les notifications trop longues)
-        minuterieCompte = setInterval(() => relire().catch(e => { $("compteDiag").textContent = "debug : erreur relecture - " + (e.message || e); }), 1500);
-      } catch (e) {
-        $("compteDiag").textContent = "debug : compteur indisponible - " + (e.message || e);
-      }
+        minuterieCompte = setInterval(() => relire().catch(() => {}), 1500);
+      } catch (e) { }
       afficherConnecte(true);
     } catch (e) {
       afficherConnecte(false);
